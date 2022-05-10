@@ -1,9 +1,8 @@
 	PRESERVE8
 	THUMB   
-		
-		
+			
 	import LeSignal
-	export DFTModuleAuCarre
+	export DFTModuleAuCarre	
 
 ; ====================== zone de réservation de données,  ======================================
 ;Section RAM (read only) :
@@ -12,8 +11,7 @@
 
 ;Section RAM (read write):
 	area    maram,data,readwrite
-
-	
+	import 	LeSignal
 
 	
 ; ===============================================================================================
@@ -25,9 +23,87 @@
 	area    moncode,code,readonly
 ; écrire le code ici		
 
+mask equ 0x3F ; On déclare un entier égal à 63 pour l'utiliser comme masque après pour faire un module 64
+	
+DFTModuleAuCarre proc
+		push{lr,r4-r11}
+		
+		;initialisation de la somme et l'index
+		mov r7, r1 ;r7 = k
+		mov r8, #0 ;r8 = n
+		mov r9, #0 ;r9 = Somme
+		mov r10, #64 ;Valeur à ne pas dépasser pour le for
+		
+		;ldr r1,=LeSignal ;r1 = echantillon x[] au format 4:12
+		ldr r2,=TabCos ;r2 = TabCos[] au format 1:15
+		
+	
+ForCos
+	;echantillon = son[index]
 
+		;ldrsh r3 ,[r1, r8] ;r3 = r1[r8] soit x[index]
+		
+		mul r5, r7, r8 ;r5 = p = n*k
+		and r5, #mask ; ; r5 = (n*k)%64
+		ldrsh r3, [r2, r5, lsl #1] ;r3 = Tabcos[p]
 
+		ldrsh r4, [r0, r8, lsl #1] ;r4 = x[n]
+		
+		mul r6, r3, r4 ;r6 = x[n]*Tabcos(p)
+		
+		add r9, r9, r6 ;Somme += r6 
+				
+		add r8, #1 ;n = n+1
+		
+		cmp r8, r10
+		bne ForCos
+		
+		
+				;initialisation de la somme et l'index
+		mov r7, r1 ;r7 = k
+		mov r8, #0 ;r8 = n
+		mov r11, #0 ;r9 = Somme
+		mov r10, #64 ;Valeur à ne pas dépasser pour le for
+		
+		
+		;ldr r1,=LeSignal ;r1 = echantillon x[] au format 4:12
+		ldr r2,=TabSin ;r2 = TabSin[] au format 1:15
+		
+	
+ForSin
+	;echantillon = son[index]
 
+		;ldrsh r3 ,[r1, r8] ;r3 = r1[r8] soit x[index]
+		
+		mul r5, r7, r8 ;r5 = p = n*k
+		and r5, #mask ; ; r5 = (n*k)%64
+		ldrsh r3, [r2, r5, lsl #1] ;r3 = Tabcos[p]
+
+		ldrsh r4, [r0, r8, lsl #1] ;r4 = x[n]
+		
+		mul r6, r3, r4 ;r6 = x[n]*Tabcos(p)
+		
+		add r11, r11, r6 ;Somme += r6 
+				
+		add r8, #1 ;n = n+1
+		
+		cmp r8, r10
+		bne ForSin
+		
+
+		
+		;On passe maintenant les résultats au carré
+		mov r1, #0
+		mov r2, #0
+		smlal r1, r2, r9, r9 ;Re au carré
+		smlal r1, r2, r11, r11 ;On ajoute Im au carré à ce qu'on avait avant
+		mov r0, r2
+		
+		pop{lr,r4-r11}
+		
+		bx lr	
+
+	endp
 
 ;Section ROM code (read only) :		
 	AREA Trigo, DATA, READONLY
@@ -168,75 +244,7 @@ TabSin
 		
 		
 	END	
-		
-mask equ 0x3F ; On déclare un entier égal à 63 pour l'utiliser comme masque après pour faire un module 64
 	
-	DFTModuleAuCarre proc
-		push{lr,r4-r11}
-		
-		;initialisation de la somme et l'index
-		mov r7, r1;r7 = k
-		mov r8, #0 ;r8 = n
-		mov r9, #0 ;r9 = Somme
-		mov r10, #64 ;Valeur à ne pas dépasser pour le for
-		
-		;ldr r1,=LeSignal ;r1 = echantillon x[]
-		mov r2,=TabCos ;r2 = TabCos[]
-		
-		
-ForCos
-	;echantillon = son[index]
 
-		;ldrsh r3 ,[r1, r8] ;r3 = r1[r8] soit x[index]
-		
-		mul r5, r7, r8 ;r5 = p = n*k
-		and r5, #mask ; ; r5 = (n*k)%64
-		ldrsh r3, [r2, r5] ;r3 = Tabcos[p]
 
-		ldrsh r4, [r0, r8] ;r4 = x[n]
-		
-		mul r6, r3, r4 ;r6 = x[n]*Tabcos(p)
-		
-		add r9, r9, r6 ;Somme += r6 
-				
-		add r8, #1 ;n = n+1
-		
-		cmp r8, r10
-		bne ForCos ;La somme des Cos est stockée dans r9
-		
-		
-		mov r2,=TabSin ;r2 = TabCos[]
-		
-ForSin
-	;echantillon = son[index]
-
-		;ldrsh r3 ,[r1, r8] ;r3 = r1[r8] soit x[index]
-		
-		mul r5, r7, r8 ;r5 = p = n*k
-		and r5, #mask ; ; r5 = (n*k)%64
-		ldrsh r3, [r2, r5] ;r3 = Tabsin[p]
-
-		ldrsh r4, [r0, r8] ;r4 = x[n]
-		
-		mul r6, r3, r4 ;r6 = x[n]*TabSin(p)
-		
-		add r11, r11, r6 ;Somme des imaginaires (stockée sur r11) += r6 
-				
-		add r8, #1 ;n = n+1
-		
-		cmp r8, r10
-		bne ForSin
-		
-		;On passe maintenant les résultats au carré
-		mov r1, #0
-		mov r2, #0
-		smlal r1, r2, r9, r9 ;Re au carré
-		smlal r1, r2, r9, r9 ;On ajoute Im au carré à ce qu'on avait avant
-		mov r0, r2
-		
-		pop{lr,r4-r11}
-		
-		bx lr	;On retourne le résultat
-
-	end DFTModuleAuCarre
-
+	

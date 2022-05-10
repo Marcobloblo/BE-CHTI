@@ -1,5 +1,7 @@
 --cpu Cortex-M3
 ".\obj\principal.o"
+".\obj\dft.o"
+".\obj\signal.o"
 ".\obj\startup-rvds.o"
 ".\Driver\DriverJeuLaser.lib"
 --library_type=microlib --strict --scatter ".\Obj\StepDFT.sct"
